@@ -5754,6 +5754,11 @@ function handle_create_notification(PDO $pdo): void
         json_response(['error' => 'METHOD_NOT_ALLOWED'], 405);
     }
 
+    $user = get_authenticated_user($pdo);
+    if (!$user || !in_array($user['role'], ['Super Admin', 'Developer'])) {
+        json_response(['error' => 'FORBIDDEN', 'message' => 'Only Super Admins or Developers can create notifications.'], 403);
+    }
+
     $data = json_decode(file_get_contents('php://input'), true);
     $notification = $data['notification'] ?? null;
 
@@ -5771,16 +5776,16 @@ function handle_create_notification(PDO $pdo): void
                 id, type, category, title, message, priority,
                 related_id, page_id, page_name, platform,
                 previous_value, current_value, percentage_change,
-                action_url, action_text, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                action_url, action_text, metadata, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ');
         $stmt->execute([
             $id,
-            $notification['type'],
-            $notification['category'],
+            $notification['type'] ?? 'system',
+            $notification['category'] ?? 'system_update',
             $notification['title'],
             $notification['message'],
-            $notification['priority'],
+            $notification['priority'] ?? 'Low',
             $notification['relatedId'] ?? null,
             $notification['pageId'] ?? null,
             $notification['pageName'] ?? null,
@@ -5814,6 +5819,79 @@ function handle_create_notification(PDO $pdo): void
 
         json_response(['success' => true, 'notification' => $createdNotification]);
     } catch (Throwable $e) {
+        json_response(['error' => 'QUERY_FAILED', 'message' => $e->getMessage()], 500);
+    }
+}
+
+// List all system update notifications for Admin view
+function handle_list_system_updates(PDO $pdo): void
+{
+    $user = get_authenticated_user($pdo);
+    if (!$user || !in_array($user['role'], ['Super Admin', 'Developer'])) {
+        json_response(['error' => 'FORBIDDEN', 'message' => 'Access denied'], 403);
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT n.*, GROUP_CONCAT(nr.role) as targeted_roles
+            FROM notifications n
+            LEFT JOIN notification_roles nr ON n.id = nr.notification_id
+            WHERE n.category = 'system_update'
+            GROUP BY n.id
+            ORDER BY n.timestamp DESC
+        ");
+        $stmt->execute();
+        $updates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map comma separated roles string to array
+        foreach ($updates as &$update) {
+            $update['targeted_roles'] = $update['targeted_roles'] ? explode(',', $update['targeted_roles']) : [];
+        }
+
+        json_response(['success' => true, 'updates' => $updates]);
+    } catch (Throwable $e) {
+        json_response(['error' => 'QUERY_FAILED', 'message' => $e->getMessage()], 500);
+    }
+}
+
+// Delete notification
+function handle_delete_notification(PDO $pdo): void
+{
+    if (method() !== 'POST') {
+        json_response(['error' => 'METHOD_NOT_ALLOWED'], 405);
+    }
+
+    $user = get_authenticated_user($pdo);
+    if (!$user || !in_array($user['role'], ['Super Admin', 'Developer'])) {
+        json_response(['error' => 'FORBIDDEN', 'message' => 'Access denied'], 403);
+    }
+
+    $data = json_decode(file_get_contents('php://input'), true);
+    $id = $data['id'] ?? null;
+
+    if (!$id) {
+        json_response(['error' => 'MISSING_PARAMETERS', 'message' => 'Notification ID is required.'], 400);
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        // Delete roles
+        $stmt = $pdo->prepare('DELETE FROM notification_roles WHERE notification_id = ?');
+        $stmt->execute([$id]);
+
+        // Delete read statuses
+        $stmt = $pdo->prepare('DELETE FROM notification_read_status WHERE notification_id = ?');
+        $stmt->execute([$id]);
+
+        // Delete notification
+        $stmt = $pdo->prepare('DELETE FROM notifications WHERE id = ?');
+        $stmt->execute([$id]);
+
+        $pdo->commit();
+        json_response(['success' => true]);
+    } catch (Throwable $e) {
+        $pdo->rollBack();
         json_response(['error' => 'QUERY_FAILED', 'message' => $e->getMessage()], 500);
     }
 }
@@ -5911,6 +5989,12 @@ if ($resource === 'notifications') {
         case 'create':
             handle_create_notification($pdo);
             break;
+        case 'listUpdates':
+            handle_list_system_updates($pdo);
+            break;
+        case 'deleteUpdate':
+            handle_delete_notification($pdo);
+            break;
         case 'settings':
             if ($parts[3] === 'get') {
                 handle_get_notification_settings($pdo);
@@ -5925,7 +6009,6 @@ if ($resource === 'notifications') {
     }
 }
 
-// Handle POST requests for notifications (for backward compatibility)
 if (method() === 'POST' && isset($_POST['action'])) {
     switch ($_POST['action']) {
         case 'getNotifications':
