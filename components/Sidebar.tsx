@@ -39,8 +39,8 @@ import {
   History,
   BarChart3,
   ShoppingBag,
+  Bell,
 } from "lucide-react";
-
 interface SidebarProps {
   user: UserType;
   activePage: string;
@@ -50,6 +50,9 @@ interface SidebarProps {
   onLogout: () => void;
   permissions?: Record<string, { view?: boolean; use?: boolean }> & { onChangePassword?: () => void };
   menuOrder?: string[];
+  onShowNotifications?: () => void;
+  onShowAllNotifications?: () => void;
+  hasUnreadNotifications?: boolean;
 }
 
 type NavItem = {
@@ -70,6 +73,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   permissions,
   menuOrder,
+  onShowNotifications,
+  onShowAllNotifications,
+  hasUnreadNotifications,
 }) => {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Home": true,
@@ -170,6 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     "Retro Commission": "จำลองค่าคอมย้อนหลัง",
     "System": "ระบบ",
     "Change Password": "เปลี่ยนรหัสผ่าน",
+    "Update Notifications": "แจ้งเตือนการอัพเดต",
     "Marketing Dashboard": "แดชบอร์ด (มาร์เก็ตติ้ง)",
     "Attendance Report": "รายงานเวลาเข้างาน",
     "Orders Report": "รายงานคำสั่งซื้อ",
@@ -603,10 +610,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         {navItems.map(renderNavItem)}
       </nav>
       <div className="border-t border-gray-200 mt-auto relative">
-        <div className={`p-4 ${isCollapsed ? "items-center justify-center flex" : ""}`}>
+        <div className={`p-4 ${isCollapsed ? "items-center justify-center flex flex-col gap-3" : "flex items-center justify-between gap-1"}`}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className={`flex items-center w-full hover:bg-gray-50 rounded-lg p-2 transition-colors ${isCollapsed ? "justify-center" : "space-x-3"
+            className={`flex items-center hover:bg-gray-50 rounded-lg p-2 transition-colors flex-1 ${isCollapsed ? "justify-center" : "space-x-3"
               }`}
           >
             <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-white font-bold flex-shrink-0">
@@ -627,6 +634,22 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </button>
 
+          {/* User Notification Trigger Bell */}
+          {onShowNotifications && (
+            <button
+              onClick={onShowNotifications}
+              className={`p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0 relative ${
+                isCollapsed ? "mt-1" : ""
+              }`}
+              title="แจ้งเตือนการอัปเดตระบบ"
+            >
+              <Bell className="w-5 h-5" />
+              {hasUnreadNotifications && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white animate-ping" />
+              )}
+            </button>
+          )}
+
           {/* User Dropdown */}
           {!isCollapsed && isUserMenuOpen && (
             <div className="absolute bottom-full left-0 w-full mb-1 px-2">
@@ -637,6 +660,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <Key className="w-4 h-4" /> เปลี่ยนรหัสผ่าน
                 </button>
+                {user.role === UserRole.SuperAdmin && (
+                  <button
+                    onClick={() => { setActivePage("Update Notifications"); setIsUserMenuOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4 text-gray-500" /> ตั้งค่าการแจ้งเตือนอัพเดต
+                  </button>
+                )}
                 <button
                   onClick={onLogout}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"

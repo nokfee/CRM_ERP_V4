@@ -4,6 +4,6 @@
 // const APP_BASE_PATH = '/mini_erp/';
 // const APP_BASE_PATH = '/beta_test/';
 // Keep this set to '/beta_test/' while iterating on the Monitor section.
-const APP_BASE_PATH = '/testweb1/';
+const APP_BASE_PATH = '/CRM_ERP/';
 
 export default APP_BASE_PATH;

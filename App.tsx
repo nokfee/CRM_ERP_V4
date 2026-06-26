@@ -149,6 +149,9 @@ import InventoryPage from "./pages/jst/InventoryPage";
 import CompanySettingsPage from "./pages/jst/CompanySettingsPage";
 import CancellationDashboardPage from "./pages/CancellationDashboardPage";
 import CancelConfirmModal from "./components/CancelConfirmModal";
+import UpdateNotificationManagementPage from "./pages/UpdateNotificationManagementPage";
+import SystemUpdateModal from "./components/SystemUpdateModal";
+import { listSystemUpdates, markNotificationAsRead, SystemUpdateNotification } from "./services/updateNotificationApi";
 import ShopeeLoyaltyImport from "./pages/ShopeeLoyaltyImport";
 import LoyaltyTrackerPage from "./pages/LoyaltyTrackerPage";
 import LoyaltyDashboard from "./pages/LoyaltyDashboard";
@@ -590,6 +593,7 @@ const App: React.FC = () => {
       'Reports': 'reports.reports',
       'Export History': 'reports.export_history',
       'Users': 'data.users',
+      'Update Notifications': 'data.update_notifications',
       'Products': 'data.products',
       'Quota Settings': 'data.quota_settings',
       'Pages': 'data.pages',
@@ -1834,6 +1838,72 @@ const App: React.FC = () => {
     }
     return users.length > 0 ? users[0] : null;
   }, [sessionUser, users]);
+
+  // System Update Notifications State & Effects (moved here to prevent TDZ ReferenceError on currentUser)
+  const [unreadUpdates, setUnreadUpdates] = useState<SystemUpdateNotification[]>([]);
+  const [showUpdatesModal, setShowUpdatesModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      listSystemUpdates(currentUser.id, currentUser.role, false)
+        .then((res) => {
+          if (res.success && res.notifications && res.notifications.length > 0) {
+            setUnreadUpdates(res.notifications);
+            setShowUpdatesModal(true);
+          } else {
+            setUnreadUpdates([]);
+            setShowUpdatesModal(false);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch system update notifications:", err);
+        });
+    } else {
+      setUnreadUpdates([]);
+      setShowUpdatesModal(false);
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+  const handleMarkUpdateRead = async (notificationId: string) => {
+    if (!currentUser?.id) return;
+    try {
+      await markNotificationAsRead(notificationId, currentUser.id);
+      setUnreadUpdates((prev) => {
+        const next = prev.filter((u) => u.id !== notificationId);
+        if (next.length === 0) {
+          setShowUpdatesModal(false);
+        }
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  const handleShowAllNotifications = () => {
+    if (!currentUser?.id) return;
+    listSystemUpdates(currentUser.id, currentUser.role, true) // includeRead = true
+      .then((res) => {
+        if (res.success && res.notifications) {
+          setUnreadUpdates(res.notifications);
+          setShowUpdatesModal(true);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch all updates:", err);
+      });
+  };
+
+  const handleBellClick = () => {
+    if (!currentUser?.id) return;
+    // If we already have unread notifications loaded, show them
+    if (unreadUpdates.filter(u => !u.is_read_by_user).length > 0) {
+      setShowUpdatesModal(true);
+      return;
+    }
+    // Otherwise, fetch all so they can view historical notifications
+    handleShowAllNotifications();
+  };
 
   useEffect(() => {
     const loginDate = sessionUser?.loginDate || sessionUser?.login_date;
@@ -6752,6 +6822,24 @@ const App: React.FC = () => {
         />
       );
     }
+    if (activePage === "Update Notifications") {
+      if (currentUser.role !== UserRole.SuperAdmin) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center bg-white rounded-lg shadow border border-gray-200">
+            <AlertCircle className="w-16 h-16 text-red-500 mb-4 animate-bounce" />
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+            <p className="text-gray-600 mb-4">หน้านี้อนุญาตให้เข้าถึงเฉพาะ Super Admin เท่านั้น</p>
+            <button
+              onClick={() => setActivePage("Customers")}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+            >
+              กลับหน้าแรก
+            </button>
+          </div>
+        );
+      }
+      return <UpdateNotificationManagementPage />;
+    }
     if (activePage === "Products") {
       return (
         <ProductManagementPage
@@ -8151,6 +8239,9 @@ const App: React.FC = () => {
                 onChangePassword: () => setIsChangePasswordModalOpen(true),
               }}
               menuOrder={menuOrder}
+              onShowNotifications={handleBellClick}
+              onShowAllNotifications={handleShowAllNotifications}
+              hasUnreadNotifications={unreadUpdates.some(u => !u.is_read_by_user)}
             />
           </div>
         )}
@@ -8424,6 +8515,17 @@ const App: React.FC = () => {
           orderId={cancellingOrderId}
           onConfirm={handleConfirmCancel}
           onClose={() => setCancellingOrderId(null)}
+        />
+      )}
+
+      {/* System Update Announcements Modal */}
+      {showUpdatesModal && (
+        <SystemUpdateModal
+          updates={unreadUpdates}
+          onMarkRead={handleMarkUpdateRead}
+          onClose={() => setShowUpdatesModal(false)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          hideSidebar={hideSidebar}
         />
       )}
     </ToastProvider>
