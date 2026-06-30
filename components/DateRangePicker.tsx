@@ -12,6 +12,8 @@ interface DateRangePickerProps {
   onApply?: (range: DateRange) => void;
   onChange?: (range: DateRange) => void;
   placeholder?: string;
+  className?: string;
+  hidePresets?: boolean;
 }
 
 const isSameDay = (a: Date, b: Date) =>
@@ -20,7 +22,7 @@ const isSameDay = (a: Date, b: Date) =>
 const inBetween = (d: Date, s: Date | null, e: Date | null) =>
   s && e ? d.getTime() >= s.getTime() && d.getTime() <= e.getTime() : false;
 
-const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onApply, onChange, placeholder = 'ทั้งหมด' }) => {
+const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onApply, onChange, placeholder = 'ทั้งหมด', className, hidePresets = false }) => {
   const [open, setOpen] = useState(false);
   const [rangeTempStart, setRangeTempStart] = useState<Date | null>(null);
   const [rangeTempEnd, setRangeTempEnd] = useState<Date | null>(null);
@@ -194,11 +196,11 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onApply, onCha
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <div className={`relative ${className || ''}`} ref={ref}>
       <button
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
-        className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex items-center gap-2 bg-white hover:border-gray-300 transition-colors shadow-sm"
+        className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex items-center gap-2 bg-white hover:border-gray-300 transition-colors shadow-sm w-full"
       >
         <Calendar className="w-4 h-4 text-blue-500" />
         <span className="text-gray-700">{display}</span>
@@ -207,27 +209,29 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ value, onApply, onCha
       {open && (
         <div className={`absolute top-full mt-1 z-[9999] bg-white rounded-xl shadow-xl border border-gray-200 p-5 w-auto ${alignRight ? 'right-0' : 'left-0'}`} style={{ minWidth: '640px' }}>
           {/* Preset Buttons */}
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {[
-              { label: 'ทั้งหมด', fn: () => { setRangeTempStart(null); setRangeTempEnd(null); } },
-              { label: 'วันนี้', fn: () => applyPreset(1) },
-              { label: 'เมื่อวาน', fn: () => applyPreset(2) },
-              { label: '7 วัน', fn: () => applyPreset(7) },
-              { label: '30 วัน', fn: () => applyPreset(30) },
-              { label: '60 วัน', fn: () => applyPreset(60) },
-              { label: '90 วัน', fn: () => applyPreset(90) },
-              { label: 'เดือนนี้', fn: applyThisMonth },
-              { label: 'เดือนที่แล้ว', fn: applyLastMonth },
-            ].map(p => (
-              <button
-                key={p.label}
-                onClick={p.fn}
-                className="px-2.5 py-1 text-xs rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors text-gray-600"
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {!hidePresets && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {[
+                { label: 'ทั้งหมด', fn: () => { setRangeTempStart(null); setRangeTempEnd(null); } },
+                { label: 'วันนี้', fn: () => applyPreset(1) },
+                { label: 'เมื่อวาน', fn: () => applyPreset(2) },
+                { label: '7 วัน', fn: () => applyPreset(7) },
+                { label: '30 วัน', fn: () => applyPreset(30) },
+                { label: '60 วัน', fn: () => applyPreset(60) },
+                { label: '90 วัน', fn: () => applyPreset(90) },
+                { label: 'เดือนนี้', fn: applyThisMonth },
+                { label: 'เดือนที่แล้ว', fn: applyLastMonth },
+              ].map(p => (
+                <button
+                  key={p.label}
+                  onClick={p.fn}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors text-gray-600"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Month Navigation */}
           <div className="flex items-center justify-between mb-3">

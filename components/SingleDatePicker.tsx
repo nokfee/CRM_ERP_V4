@@ -7,6 +7,7 @@ interface SingleDatePickerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  hidePresets?: boolean;
 }
 
 const isSameDay = (a: Date, b: Date) =>
@@ -19,7 +20,7 @@ const toYMD = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
-const SingleDatePicker: React.FC<SingleDatePickerProps> = ({ value, onChange, placeholder = 'เลือกวันที่', disabled, className }) => {
+const SingleDatePicker: React.FC<SingleDatePickerProps> = ({ value, onChange, placeholder = 'เลือกวันที่', disabled, className, hidePresets = false }) => {
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => {
     if (value) {
@@ -134,17 +135,19 @@ const SingleDatePicker: React.FC<SingleDatePickerProps> = ({ value, onChange, pl
       {open && (
         <div className="absolute top-full left-0 mt-1 z-[9999] bg-white rounded-xl shadow-xl border border-gray-200 p-4 w-auto" style={{ minWidth: '320px' }}>
           {/* Presets */}
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {presets.map(p => (
-              <button
-                key={p.label}
-                onClick={p.fn}
-                className="px-2.5 py-1 text-xs rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors text-gray-600"
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {!hidePresets && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {presets.map(p => (
+                <button
+                  key={p.label}
+                  onClick={p.fn}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors text-gray-600"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Navigation */}
           <div className="flex items-center justify-between mb-2">
